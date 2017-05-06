@@ -37,6 +37,44 @@ parser.add_argument('-a', '--all',
                     help='if want commit and restart all container set True')
 
 
+parser.add_argument('-i', '--image',
+                    type=str,
+                    required=False,
+                    default='',
+                    help='image name')
+
+
+RM={
+    "img":{
+        "r_dot":{
+          "o":".",
+          "f":"@"
+        },
+        "r_spl":{
+          "o":"/",
+          "f":"#"
+        }
+    },
+    "ct":{
+        "i_dot":{
+          "o":".",
+          "f":"@"
+        },
+        "i_spl":{
+          "o":"/",
+          "f":"#"
+        },
+        "c_dot":{
+          "o":".",
+          "f":"^"
+        },
+        "c_spl":{
+          "o":"/",
+          "f":"|"
+        },
+    }
+}
+
 class Image:
     def __init__(self):
         self.repository = ""
@@ -53,7 +91,7 @@ class Image:
         dockerarg = ["docker", "load", "-i", path + filename]
         print "img_load", str.join(" ", dockerarg)
         stat = subprocess.check_output(dockerarg)
-        dockerarg = ["docker", "tag", self.image_id, self.repository.replace("=", "/") + ":" + self.tag]
+        dockerarg = ["docker", "tag", self.image_id, self.repository + ":" + self.tag]
         print "img_tag", str.join(" ", dockerarg)
         stat = subprocess.check_output(dockerarg)
         print "img_resutl", stat
@@ -62,7 +100,7 @@ class Image:
     def build_image_by_file(filename):
         tmp_arr = filename.split("_")
         img = Image()
-        img.repository = tmp_arr[0].replace('|', '/')
+        img.repository = tmp_arr[0].replace(RM["img"]["r_dot"]["f"], RM["img"]["r_dot"]["o"]).replace(RM["img"]["r_spl"]["f"], RM["img"]["r_spl"]["o"])
         img.tag = tmp_arr[1]
         img.image_id = tmp_arr[2].split(".")[0]
         return img
@@ -80,7 +118,7 @@ class Image:
             if tapp[0] == "<none>":
                 img.repository = "none"
             else:
-                img.repository = tapp[0].replace('/', '|').replace('.', '@')
+                img.repository = tapp[0].replace(RM["img"]["r_spl"]["o"], RM["img"]["r_spl"]["f"]).replace(RM["img"]["r_dot"]["o"], RM["img"]["r_dot"]["f"])
             img.tag = tapp[1]
             if img.tag == "<none>":
                 img.tag = "none"
@@ -138,7 +176,7 @@ class Container:
         stat = subprocess.check_output(dockerarg)
 
     def commit(self, path):
-        dockerarg = ["touch", path + self.names + "_" + self.image.replace('/', '|') + "_" + self.container_id + "_" + str.join("+", Container.trans_port_map(self.ports)) + "_" + self.command + ".dockercommit"]
+        dockerarg = ["touch", path + self.names + "_" + self.image.replace(RM["ct"]["i_spl"]["o"], RM["ct"]["i_spl"]["f"]).replace(RM["ct"]["i_dot"]["o"], RM["ct"]["i_dot"]["f"]) + "_" + self.container_id + "_" + str.join("+", Container.trans_port_map(self.ports)) + "_" + self.command + ".dockercommit"]
         print "container_touch", str.join(" ", dockerarg)
         stat = subprocess.check_output(dockerarg)
         dockerarg = ["docker", "commit", self.container_id, "c/" + self.image]
@@ -187,15 +225,14 @@ class Container:
     @staticmethod
     def build_container_by_file(filename):
         tmp_arr = filename.split("_")
-        print tmp_arr
         container = Container()
         container.names = tmp_arr[0]
-        container.image = tmp_arr[1].replace('|', '/')
+        container.image = tmp_arr[1].replace(RM["ct"]["i_dot"]["f"], RM["ct"]["i_dot"]["o"]).replace(RM["ct"]["i_spl"]["f"], RM["ct"]["i_spl"]["o"])  
         container.container_id = tmp_arr[2]
         container.ports = tmp_arr[3]
         # docker-entrypoint#sh
         container.command = tmp_arr[4].split(".")[0]
-        container.command = container.command.replace("/", "^").replace("#", ".")
+        container.command = container.command.replace(RM["ct"]["c_dot"]["f"], RM["ct"]["c_dot"]["o"]).replace(RM["ct"]["c_spl"]["f"], RM["ct"]["c_spl"]["o"])  
         # print "container.command",container.command
         return container
 
@@ -214,7 +251,7 @@ class Container:
             container.command = tapp[2]
             if "docker-entrypoint" in container.command:
                 container.command = "docker-entrypoint.sh"
-            container.command = container.command.replace("/", "^").replace('"', '').replace('.', '#')
+            container.command = container.command.replace(RM["ct"]["c_dot"]["o"], RM["ct"]["c_dot"]["f"]).replace(RM["ct"]["c_spl"]["o"], RM["ct"]["c_spl"]["f"]).replace('"', '')
             container.ports = tapp[5]
             container.names = tapp[6]
             return container
@@ -225,6 +262,7 @@ def save_images(args):
     # backup_path = os.path.join(os.path.expanduser("~"), 'images')
     # if args.path is not None:
     backup_path = args.path
+    img_name=args.image
     stat = subprocess.check_output(["docker", "images"])
     statarr = stat.split("\n")
     statarr = statarr[1:]
@@ -232,24 +270,29 @@ def save_images(args):
         img = Image.build_image_by_info(dinfo)
         if not img:
             continue
-        img.save(backup_path)
-        break
+        if len(img_name)==0 or img_name in img.repository:
+            img.save(backup_path)
 
+
+        
 
 def load_images(args):
     # backup_path = os.path.join(os.path.expanduser("~"), 'images')
     # backup_path = os.path.join(os.path.expanduser("~"))
     # if args.path is not None:
     backup_path = args.path
-    print backup_path
+    img_name=args.image
+    # print backup_path
     tmp_files = os.listdir(backup_path)
     try:
         for filepath in tmp_files:
+            print filepath
             if re.findall('.*\.dockerimg$', filepath):
                 print "image_file", filepath
                 img = Image.build_image_by_file(filepath)
-                print img
-                img.load(backup_path, filepath)
+                if len(img_name)==0 or img_name in img.repository:
+                  print img
+                  img.load(backup_path, filepath)
     except Exception, ex:
         print ex
         print "current directory has no docker image file"
@@ -318,7 +361,8 @@ def restart_containers(args):
 
 def save(args):
     # 1 commit container
-    commit_containers(args)
+    if len(args.image)==0:
+       commit_containers(args)
     # 2 save images
     save_images(args)
 
@@ -327,7 +371,8 @@ def load(args):
     # 1 load images
     load_images(args)
     # 2 restart container
-    restart_containers(args)
+    if len(args.image)==0:
+       restart_containers(args)
 
 
 if __name__ == '__main__':
