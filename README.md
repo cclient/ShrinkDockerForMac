@@ -24,7 +24,7 @@ this script can restart container with current port but cann't resume the volume
 in order to avoid the unexpected i suggest do it manual
 
 
-# 1 python shrink -t save
+# 1 python shrink.py -t save
 
 
 # 2 quit docker process and remove Docker.qcow2(rename to Docker.qcow2_back is better)
