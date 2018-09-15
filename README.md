@@ -33,7 +33,7 @@ in order to avoid the unexpected i suggest do it manual
 # 3 start docker process it will auto rebuild a new Docker.qcow2 file,wait it accomplish
 
 
-# 4 python shrink -t load
+# 4 python shrink.py -t load
 
 # 5 remove the tmp file
 
